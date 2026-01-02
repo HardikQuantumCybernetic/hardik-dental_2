@@ -233,6 +233,13 @@ export const SmartDentalChatbot: React.FC = () => {
 
   const getGeminiResponse = async (message: string): Promise<string> => {
     try {
+      // Check if user is authenticated (required for AI chatbot)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        return "🔐 To use our AI-powered assistant, please log in to your account. For immediate help, call us at (808) 095-0921.";
+      }
+      
       const context = `You are a helpful dental assistant for Hardik Dental Practice. 
       Our services include: General Dentistry, Teeth Cleaning, Fillings, Root Canals, Braces, Cosmetic Dentistry, Teeth Whitening, Emergency Care.
       Our hours: Monday-Saturday 9 AM - 6 PM, Saturday 9 AM - 2 PM.
@@ -247,6 +254,17 @@ export const SmartDentalChatbot: React.FC = () => {
 
       if (error) {
         console.error('❌ Gemini API error:', error);
+        
+        // Handle rate limiting response
+        if (error.message?.includes('429') || error.message?.includes('Too Many Requests')) {
+          return "⏳ You've sent too many messages. Please wait a moment and try again. For urgent matters, call (808) 095-0921.";
+        }
+        
+        // Handle authentication errors
+        if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+          return "🔐 Your session has expired. Please refresh the page and log in again.";
+        }
+        
         throw error;
       }
 
