@@ -458,6 +458,51 @@ WHERE user_id = 'USER_ID_HERE' AND role = 'admin';
 - Enable Multi-Factor Authentication (MFA) in Supabase for admin accounts
 - Never share admin credentials
 
+### API Security Features
+
+The application implements production-grade API security:
+
+#### 1. Rate Limiting
+All API endpoints are protected with rate limiting to prevent abuse:
+- **Default**: 100 requests per minute per user
+- **Configurable** via environment variables:
+  - `RATE_LIMIT_MAX_REQUESTS`: Maximum requests per window (default: 100)
+  - `RATE_LIMIT_WINDOW_MS`: Time window in milliseconds (default: 60000)
+- **Response Headers**: Includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+- **HTTP 429**: Returned when limit exceeded with `Retry-After` header
+
+#### 2. Authentication & Authorization
+- **JWT Verification**: All protected endpoints require valid JWT tokens
+- **Token Validation**: Tokens are verified against Supabase Auth on every request
+- **Role-Based Access**: Admin, Doctor, Staff, and Patient roles with appropriate permissions
+- **HTTP 401/403**: Returned for unauthenticated/unauthorized requests
+
+#### 3. CORS Configuration
+Strict Cross-Origin Resource Sharing policy:
+- **Whitelisted Origins Only**: Requests from unauthorized origins are blocked
+- **Environment-Specific**: Different origins for development and production
+- **Credentials Support**: Properly configured for authenticated requests
+- **No Wildcards**: `Access-Control-Allow-Origin: *` is NOT used for authenticated endpoints
+
+**Allowed Origins** (configurable in edge functions):
+- Production: Your Supabase domain
+- Development: `localhost:3000`, `localhost:5173`, `localhost:8080`
+
+To add production domains, update `ALLOWED_ORIGINS` in `supabase/functions/chat-with-gemini/index.ts`.
+
+#### 4. Input Validation
+- Message length limits (max 2000 characters)
+- Type validation on all inputs
+- Sanitized error messages (no internal details exposed)
+
+#### Configuring Rate Limits
+
+Set rate limit environment variables in Supabase:
+```bash
+supabase secrets set RATE_LIMIT_MAX_REQUESTS=50
+supabase secrets set RATE_LIMIT_WINDOW_MS=30000
+```
+
 ## 📱 PWA Configuration
 
 The app is configured as a Progressive Web App (PWA):
