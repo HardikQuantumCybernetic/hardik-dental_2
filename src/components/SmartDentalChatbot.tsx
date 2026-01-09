@@ -233,13 +233,6 @@ export const SmartDentalChatbot: React.FC = () => {
 
   const getGeminiResponse = async (message: string): Promise<string> => {
     try {
-      // Check if user is authenticated (required for AI chatbot)
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        return "🔐 To use our AI-powered assistant, please log in to your account. For immediate help, call us at (808) 095-0921.";
-      }
-      
       const context = `You are a helpful dental assistant for Hardik Dental Practice. 
       Our services include: General Dentistry, Teeth Cleaning, Fillings, Root Canals, Braces, Cosmetic Dentistry, Teeth Whitening, Emergency Care.
       Our hours: Monday-Saturday 9 AM - 6 PM, Saturday 9 AM - 2 PM.
