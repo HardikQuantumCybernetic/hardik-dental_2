@@ -1,6 +1,5 @@
 project_id = "mmsmljkeedqfrbgsqipf"
 
 [functions.chat-with-gemini]
-# SECURITY FIX: Enable JWT verification for authenticated access
-# This ensures only authenticated users can access the chatbot
-verify_jwt = true
+# Allow public access - rate limiting is handled in the function itself
+verify_jwt = false
