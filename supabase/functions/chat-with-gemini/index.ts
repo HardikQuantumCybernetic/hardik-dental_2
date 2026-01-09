@@ -2,41 +2,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 // =============================================================================
-// SECURITY FIX 1: STRICT CORS CONFIGURATION
+// CORS
 // =============================================================================
-// Problem: Wildcard (*) CORS allows any website to make requests to our API
-// Fix: Explicitly whitelist only trusted origins
+// This function is called from the public website, so we allow all origins.
+// Do NOT set Allow-Credentials when using '*'.
 // =============================================================================
 
-const ALLOWED_ORIGINS = [
-  // Production
-  'https://mmsmljkeedqfrbgsqipf.supabase.co',
-  // Add your production domain here when deployed
-  // 'https://yourdomain.com',
-  // 'https://www.yourdomain.com',
-  
-  // Development (only in non-production)
-  ...(Deno.env.get('ENVIRONMENT') !== 'production' ? [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:8080',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:8080',
-  ] : [])
-]
-
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  // Validate origin against allowlist
-  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
-  
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Credentials': 'true',
-    'Access-Control-Max-Age': '86400', // Cache preflight for 24 hours
-  }
+const corsHeaders: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 // =============================================================================
@@ -177,38 +152,17 @@ async function tryAuth(req: Request): Promise<AuthResult> {
 // =============================================================================
 
 serve(async (req) => {
-  const origin = req.headers.get('origin')
-  const corsHeaders = getCorsHeaders(origin)
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders 
-    })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
   
   // Only allow POST method
   if (req.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { 
-        status: 405, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
-  }
-  
-  // Validate origin
-  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-    console.warn(`Blocked request from unauthorized origin: ${origin}`)
-    return new Response(
-      JSON.stringify({ error: 'Origin not allowed' }),
-      { 
-        status: 403, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
   try {
