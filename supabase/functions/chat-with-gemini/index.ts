@@ -112,33 +112,38 @@ function getRateLimitHeaders(rateLimit: { remaining: number; resetTime: number }
 }
 
 // =============================================================================
-// SECURITY FIX 3: AUTHENTICATION & AUTHORIZATION
+// OPTIONAL AUTHENTICATION (for rate limiting purposes)
 // =============================================================================
-// Problem: API accepts requests without authentication
-// Fix: Validate JWT tokens and enforce user authentication
+// Allow both authenticated and unauthenticated users
+// Authenticated users get rate limited by user ID, others by IP
 // =============================================================================
 
 interface AuthResult {
   authenticated: boolean
   userId?: string
-  error?: string
+  identifier: string // Used for rate limiting
 }
 
-async function validateAuth(req: Request): Promise<AuthResult> {
+async function tryAuth(req: Request): Promise<AuthResult> {
   const authHeader = req.headers.get('authorization')
   
+  // Get client IP for rate limiting fallback
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                   req.headers.get('cf-connecting-ip') || 
+                   'unknown'
+  
   if (!authHeader) {
-    return { authenticated: false, error: 'Missing authorization header' }
+    return { authenticated: false, identifier: `ip:${clientIp}` }
   }
   
   const token = authHeader.replace('Bearer ', '')
   
-  if (!token) {
-    return { authenticated: false, error: 'Invalid token format' }
+  if (!token || token === Deno.env.get('SUPABASE_ANON_KEY')) {
+    // Just the anon key, not a user token
+    return { authenticated: false, identifier: `ip:${clientIp}` }
   }
   
   try {
-    // Create Supabase client to verify the token
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!
     
@@ -154,18 +159,16 @@ async function validateAuth(req: Request): Promise<AuthResult> {
       }
     })
     
-    // Verify the token by getting the user
     const { data: { user }, error } = await supabase.auth.getUser(token)
     
     if (error || !user) {
-      console.error('Auth validation failed:', error?.message)
-      return { authenticated: false, error: 'Invalid or expired token' }
+      return { authenticated: false, identifier: `ip:${clientIp}` }
     }
     
-    return { authenticated: true, userId: user.id }
+    return { authenticated: true, userId: user.id, identifier: `user:${user.id}` }
   } catch (error) {
-    console.error('Auth error:', error)
-    return { authenticated: false, error: 'Authentication failed' }
+    console.error('Auth check error:', error)
+    return { authenticated: false, identifier: `ip:${clientIp}` }
   }
 }
 
@@ -210,33 +213,14 @@ serve(async (req) => {
 
   try {
     // =======================================================================
-    // SECURITY CHECK 1: Authentication
+    // Rate Limiting (by user ID if authenticated, otherwise by IP)
     // =======================================================================
-    const authResult = await validateAuth(req)
-    
-    if (!authResult.authenticated) {
-      console.warn('Unauthenticated request blocked:', authResult.error)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Unauthorized',
-          message: authResult.error 
-        }),
-        { 
-          status: 401, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-    
-    // =======================================================================
-    // SECURITY CHECK 2: Rate Limiting (by user ID for authenticated requests)
-    // =======================================================================
-    const rateLimitKey = `user:${authResult.userId}`
-    const rateLimit = checkRateLimit(rateLimitKey)
+    const authResult = await tryAuth(req)
+    const rateLimit = checkRateLimit(authResult.identifier)
     const rateLimitHeaders = getRateLimitHeaders(rateLimit)
     
     if (!rateLimit.allowed) {
-      console.warn(`Rate limit exceeded for user: ${authResult.userId}`)
+      console.warn(`Rate limit exceeded for: ${authResult.identifier}`)
       return new Response(
         JSON.stringify({ 
           error: 'Too Many Requests',
@@ -256,7 +240,7 @@ serve(async (req) => {
     }
     
     // =======================================================================
-    // BUSINESS LOGIC (with security measures in place)
+    // BUSINESS LOGIC
     // =======================================================================
     const { message, context } = await req.json()
     
@@ -332,7 +316,7 @@ serve(async (req) => {
     const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || 
       "I'm here to help with your dental questions. Please call our office at (808) 095-0921 for specific medical advice."
 
-    console.log(`Request processed successfully for user: ${authResult.userId}`)
+    console.log(`Request processed successfully for: ${authResult.identifier}`)
     
     return new Response(
       JSON.stringify({ response: generatedText }),
