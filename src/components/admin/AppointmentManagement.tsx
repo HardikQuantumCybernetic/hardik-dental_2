@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Calendar, Clock, User, Phone, MapPin, CheckCircle, XCircle, AlertCircle, Loader2, Trash2 } from "lucide-react";
+import { Calendar, Clock, User, Phone, MapPin, CheckCircle, XCircle, AlertCircle, Loader2, Trash2, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppointments } from "@/hooks/useSupabase";
 import { useDoctors } from "@/hooks/useSupabaseExtended";
@@ -46,6 +46,46 @@ const AppointmentManagement = () => {
         });
       }
     }
+  };
+
+  const handleSendWhatsApp = (appointment: any) => {
+    // Format the phone number (remove spaces, dashes, etc.)
+    const phone = appointment.patient_phone?.replace(/[\s\-\(\)]/g, '') || '';
+    
+    if (!phone) {
+      toast({
+        title: "Phone number missing",
+        description: "No phone number available for this patient. Please update patient details.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Create the message with appointment details
+    const message = `🦷 *Dental Appointment Reminder*
+
+Hello ${appointment.patient_name || 'Patient'},
+
+Your appointment details:
+📅 Date: ${appointment.appointment_date}
+⏰ Time: ${appointment.appointment_time}
+👨‍⚕️ Doctor: Dr. ${appointment.doctor}
+🏥 Service: ${appointment.service_type}
+📋 Status: ${appointment.status}
+${appointment.notes ? `📝 Notes: ${appointment.notes}` : ''}
+
+Please arrive 10 minutes before your scheduled time.
+
+Thank you for choosing our dental clinic!`;
+
+    // Open WhatsApp with pre-filled message
+    const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+    
+    toast({
+      title: "WhatsApp Opened",
+      description: "Message prepared for sending via WhatsApp",
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -205,6 +245,15 @@ const AppointmentManagement = () => {
                       Reschedule
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="success"
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleSendWhatsApp(appointment)}
+                  >
+                    <MessageCircle className="w-4 h-4 mr-1" />
+                    WhatsApp
+                  </Button>
                   <Button
                     size="sm"
                     variant="destructive"
