@@ -263,7 +263,24 @@ serve(async (req) => {
     const data = await response.json()
     
     if (!response.ok) {
-      console.error('Gemini API error:', data)
+      console.error('Gemini API error:', response.status, data)
+      
+      // Handle quota exceeded errors gracefully
+      if (response.status === 429 || data.error?.message?.includes('Quota exceeded')) {
+        return new Response(
+          JSON.stringify({ 
+            response: "I'm currently experiencing high demand. Please try again in a minute, or call our office at (808) 095-0921 for immediate assistance."
+          }),
+          {
+            headers: { 
+              ...corsHeaders, 
+              ...rateLimitHeaders,
+              'Content-Type': 'application/json' 
+            },
+          },
+        )
+      }
+      
       throw new Error(data.error?.message || 'Failed to get response from Gemini')
     }
 
