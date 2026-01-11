@@ -1,19 +1,23 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingSkeleton } from "@/components/ui/loading-skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Calendar, Clock, User, Phone, MapPin, CheckCircle, XCircle, AlertCircle, Loader2, Trash2, MessageCircle } from "lucide-react";
+import { Calendar, Clock, User, Phone, CheckCircle, XCircle, AlertCircle, Trash2, MessageCircle, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppointments } from "@/hooks/useSupabase";
 import { useDoctors } from "@/hooks/useSupabaseExtended";
 import AppointmentScheduling from "./AppointmentScheduling";
+
 const AppointmentManagement = () => {
   const { toast } = useToast();
   const { appointments, loading, updateAppointment, deleteAppointment } = useAppointments();
   const { doctors } = useDoctors();
   const [open, setOpen] = useState(false);
+  const [selectedAppointments, setSelectedAppointments] = useState<Set<string>>(new Set());
+
   const handleStatusChange = async (appointmentId: string, newStatus: "scheduled" | "confirmed" | "completed" | "cancelled" | "no-show") => {
     try {
       await updateAppointment(appointmentId, { status: newStatus });
@@ -34,6 +38,11 @@ const AppointmentManagement = () => {
     if (window.confirm("Are you sure you want to delete this appointment? This action cannot be undone.")) {
       try {
         await deleteAppointment(appointmentId);
+        setSelectedAppointments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(appointmentId);
+          return newSet;
+        });
         toast({
           title: "Success",
           description: "Appointment deleted successfully",
@@ -49,7 +58,6 @@ const AppointmentManagement = () => {
   };
 
   const handleSendWhatsApp = (appointment: any) => {
-    // Format the phone number (remove spaces, dashes, etc.)
     const phone = appointment.patient_phone?.replace(/[\s\-\(\)]/g, '') || '';
     
     if (!phone) {
@@ -61,7 +69,6 @@ const AppointmentManagement = () => {
       return;
     }
 
-    // Create the message with appointment details
     const message = `🦷 *Dental Appointment Reminder*
 
 Hello ${appointment.patient_name || 'Patient'},
@@ -78,7 +85,6 @@ Please arrive 10 minutes before your scheduled time.
 
 Thank you for choosing our dental clinic!`;
 
-    // Open WhatsApp with pre-filled message
     const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     
@@ -86,6 +92,67 @@ Thank you for choosing our dental clinic!`;
       title: "WhatsApp Opened",
       description: "Message prepared for sending via WhatsApp",
     });
+  };
+
+  // Toggle selection for a single appointment
+  const toggleSelection = (appointmentId: string) => {
+    setSelectedAppointments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(appointmentId)) {
+        newSet.delete(appointmentId);
+      } else {
+        newSet.add(appointmentId);
+      }
+      return newSet;
+    });
+  };
+
+  // Select or deselect all appointments
+  const toggleSelectAll = () => {
+    if (selectedAppointments.size === appointments.length) {
+      setSelectedAppointments(new Set());
+    } else {
+      setSelectedAppointments(new Set(appointments.map(a => a.id)));
+    }
+  };
+
+  // Send bulk WhatsApp reminders
+  const handleBulkWhatsApp = () => {
+    const selected = appointments.filter(a => selectedAppointments.has(a.id));
+    const withPhone = selected.filter(a => a.patient_phone);
+    const withoutPhone = selected.filter(a => !a.patient_phone);
+
+    if (withPhone.length === 0) {
+      toast({
+        title: "No valid phone numbers",
+        description: "None of the selected appointments have phone numbers.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (withoutPhone.length > 0) {
+      toast({
+        title: "Some patients missing phone",
+        description: `${withoutPhone.length} patient(s) have no phone number and will be skipped.`,
+        variant: "default"
+      });
+    }
+
+    // Open WhatsApp for each selected appointment (with a small delay to avoid popup blocking)
+    withPhone.forEach((appointment, index) => {
+      setTimeout(() => {
+        handleSendWhatsApp(appointment);
+      }, index * 500); // 500ms delay between each
+    });
+
+    toast({
+      title: "Bulk WhatsApp Started",
+      description: `Opening ${withPhone.length} WhatsApp message(s)...`,
+    });
+
+    // Clear selection after sending
+    setSelectedAppointments(new Set());
   };
 
   const getStatusColor = (status: string) => {
@@ -123,7 +190,8 @@ Thank you for choosing our dental clinic!`;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">Appointment Management</h2>
           <p className="text-dental-gray">Manage and track patient appointments ({appointments.length} total)</p>
@@ -145,6 +213,42 @@ Thank you for choosing our dental clinic!`;
         </Dialog>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {appointments.length > 0 && (
+        <Card className="border-green-200 bg-green-50/50">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="select-all"
+                  checked={selectedAppointments.size === appointments.length && appointments.length > 0}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                  {selectedAppointments.size === appointments.length 
+                    ? "Deselect All" 
+                    : "Select All"}
+                </label>
+                {selectedAppointments.size > 0 && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {selectedAppointments.size} selected
+                  </Badge>
+                )}
+              </div>
+
+              <Button
+                onClick={handleBulkWhatsApp}
+                disabled={selectedAppointments.size === 0}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                Send Bulk WhatsApp ({selectedAppointments.size})
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {appointments.length === 0 ? (
         <Card className="border-dental-blue-light">
           <CardContent className="p-8 text-center">
@@ -154,42 +258,56 @@ Thank you for choosing our dental clinic!`;
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 max-h-[65vh] overflow-y-auto pr-2">
+        <div className="grid gap-4 max-h-[55vh] overflow-y-auto pr-2">
           {appointments.map((appointment) => (
-            <Card key={appointment.id} className="border-dental-blue-light hover:shadow-md transition-shadow">
+            <Card 
+              key={appointment.id} 
+              className={`border-dental-blue-light hover:shadow-md transition-shadow ${
+                selectedAppointments.has(appointment.id) ? 'ring-2 ring-green-500 bg-green-50/30' : ''
+              }`}
+            >
               <CardContent className="p-4 sm:p-6">
                 <div className="space-y-4">
-                  {/* Header with patient info and status */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div>
-                      <h3 className="font-semibold text-lg text-foreground">
-                        Patient: {appointment.patient_name || `ID: ${appointment.patient_id?.slice(0, 8)}...`}
-                      </h3>
-                      <p className="text-dental-gray">{appointment.service_type}</p>
-                    </div>
+                  {/* Header with checkbox, patient info and status */}
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <Checkbox
+                      checked={selectedAppointments.has(appointment.id)}
+                      onCheckedChange={() => toggleSelection(appointment.id)}
+                      className="mt-1"
+                    />
 
-                    <div className="flex items-center gap-2 self-start sm:self-center">
-                      <Badge className={`${getStatusColor(appointment.status)} flex items-center space-x-1 w-fit`}>
-                        {getStatusIcon(appointment.status)}
-                        <span className="capitalize">{appointment.status}</span>
-                      </Badge>
+                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h3 className="font-semibold text-lg text-foreground">
+                          Patient: {appointment.patient_name || `ID: ${appointment.patient_id?.slice(0, 8)}...`}
+                        </h3>
+                        <p className="text-dental-gray">{appointment.service_type}</p>
+                      </div>
 
-                      {/* Prominent WhatsApp icon button (always visible) */}
-                      <Button
-                        type="button"
-                        size="icon"
-                        className="bg-green-600 hover:bg-green-700 text-white h-9 w-9"
-                        onClick={() => handleSendWhatsApp(appointment)}
-                        aria-label="Send appointment details on WhatsApp"
-                        title="Send WhatsApp"
-                      >
-                        <MessageCircle className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2 self-start sm:self-center">
+                        <Badge className={`${getStatusColor(appointment.status)} flex items-center space-x-1 w-fit`}>
+                          {getStatusIcon(appointment.status)}
+                          <span className="capitalize">{appointment.status}</span>
+                        </Badge>
+
+                        {/* Prominent WhatsApp icon button */}
+                        <Button
+                          type="button"
+                          size="icon"
+                          className="bg-green-600 hover:bg-green-700 text-white h-9 w-9"
+                          onClick={() => handleSendWhatsApp(appointment)}
+                          aria-label="Send appointment details on WhatsApp"
+                          title="Send WhatsApp"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   
                   {/* Appointment details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-dental-gray">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-dental-gray ml-7">
                     <div className="flex items-center space-x-2">
                       <Calendar className="w-4 h-4 text-dental-blue" />
                       <span>{appointment.appointment_date}</span>
@@ -206,7 +324,7 @@ Thank you for choosing our dental clinic!`;
                   
                   {/* Phone number display */}
                   {appointment.patient_phone && (
-                    <div className="flex items-center space-x-2 text-sm text-dental-gray">
+                    <div className="flex items-center space-x-2 text-sm text-dental-gray ml-7">
                       <Phone className="w-4 h-4 text-dental-blue" />
                       <span>{appointment.patient_phone}</span>
                     </div>
@@ -214,7 +332,7 @@ Thank you for choosing our dental clinic!`;
                   
                   {/* Notes */}
                   {appointment.notes && (
-                    <div className="p-3 bg-dental-blue-light rounded-lg">
+                    <div className="p-3 bg-dental-blue-light rounded-lg ml-7">
                       <p className="text-sm text-dental-gray">
                         <strong>Notes:</strong> {appointment.notes}
                       </p>
@@ -222,7 +340,7 @@ Thank you for choosing our dental clinic!`;
                   )}
                   
                   {/* Action buttons */}
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border ml-7">
                     {appointment.status === 'scheduled' && (
                       <>
                         <Button
@@ -297,7 +415,7 @@ Thank you for choosing our dental clinic!`;
                   </div>
                 </div>
               </CardContent>
-          </Card>
+            </Card>
           ))}
         </div>
       )}
