@@ -157,23 +157,24 @@ Thank you for choosing our dental clinic!`;
         <div className="grid gap-4 max-h-[65vh] overflow-y-auto pr-2">
           {appointments.map((appointment) => (
             <Card key={appointment.id} className="border-dental-blue-light hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                     <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg text-foreground">
-                          Patient: {appointment.patient_name || `ID: ${appointment.patient_id?.slice(0, 8)}...`}
-                        </h3>
-                        <p className="text-dental-gray">{appointment.service_type}</p>
-                      </div>
-                      <Badge className={`${getStatusColor(appointment.status)} flex items-center space-x-1`}>
-                        {getStatusIcon(appointment.status)}
-                        <span className="capitalize">{appointment.status}</span>
-                      </Badge>
+              <CardContent className="p-4 sm:p-6">
+                <div className="space-y-4">
+                  {/* Header with patient info and status */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="font-semibold text-lg text-foreground">
+                        Patient: {appointment.patient_name || `ID: ${appointment.patient_id?.slice(0, 8)}...`}
+                      </h3>
+                      <p className="text-dental-gray">{appointment.service_type}</p>
                     </div>
+                    <Badge className={`${getStatusColor(appointment.status)} flex items-center space-x-1 w-fit`}>
+                      {getStatusIcon(appointment.status)}
+                      <span className="capitalize">{appointment.status}</span>
+                    </Badge>
+                  </div>
                   
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-dental-gray">
+                  {/* Appointment details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-dental-gray">
                     <div className="flex items-center space-x-2">
                       <Calendar className="w-4 h-4 text-dental-blue" />
                       <span>{appointment.appointment_date}</span>
@@ -188,83 +189,99 @@ Thank you for choosing our dental clinic!`;
                     </div>
                   </div>
                   
+                  {/* Phone number display */}
+                  {appointment.patient_phone && (
+                    <div className="flex items-center space-x-2 text-sm text-dental-gray">
+                      <Phone className="w-4 h-4 text-dental-blue" />
+                      <span>{appointment.patient_phone}</span>
+                    </div>
+                  )}
+                  
+                  {/* Notes */}
                   {appointment.notes && (
-                    <div className="mt-3 p-3 bg-dental-blue-light rounded-lg">
+                    <div className="p-3 bg-dental-blue-light rounded-lg">
                       <p className="text-sm text-dental-gray">
                         <strong>Notes:</strong> {appointment.notes}
                       </p>
                     </div>
                   )}
-                </div>
-                
-                <div className="flex flex-col space-y-2 ml-4">
-                  {appointment.status === 'scheduled' && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="dental"
-                        onClick={() => handleStatusChange(appointment.id, 'confirmed')}
-                      >
-                        Confirm
-                      </Button>
+                  
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                    {appointment.status === 'scheduled' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="dental"
+                          onClick={() => handleStatusChange(appointment.id, 'confirmed')}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Confirm
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(appointment.id, 'cancelled')}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                    
+                    {appointment.status === 'confirmed' && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="dental"
+                          onClick={() => handleStatusChange(appointment.id, 'completed')}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Complete
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusChange(appointment.id, 'cancelled')}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Cancel
+                        </Button>
+                      </>
+                    )}
+                    
+                    {(appointment.status === 'completed' || appointment.status === 'cancelled') && (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleStatusChange(appointment.id, 'cancelled')}
+                        onClick={() => handleStatusChange(appointment.id, 'scheduled')}
                       >
-                        Cancel
+                        <Calendar className="w-4 h-4 mr-1" />
+                        Reschedule
                       </Button>
-                    </>
-                  )}
-                  
-                  {appointment.status === 'confirmed' && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="dental"
-                        onClick={() => handleStatusChange(appointment.id, 'completed')}
-                      >
-                        Complete
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleStatusChange(appointment.id, 'cancelled')}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  )}
-                  
-                  {(appointment.status === 'completed' || appointment.status === 'cancelled') && (
+                    )}
+                    
+                    {/* WhatsApp Button - Always visible */}
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={() => handleStatusChange(appointment.id, 'scheduled')}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleSendWhatsApp(appointment)}
                     >
-                      Reschedule
+                      <MessageCircle className="w-4 h-4 mr-1" />
+                      Send WhatsApp
                     </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="success"
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => handleSendWhatsApp(appointment)}
-                  >
-                    <MessageCircle className="w-4 h-4 mr-1" />
-                    WhatsApp
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(appointment.id)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
-                  </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(appointment.id)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
+              </CardContent>
           </Card>
           ))}
         </div>
