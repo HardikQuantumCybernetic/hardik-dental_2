@@ -6,6 +6,7 @@ import {
   Service, 
   PatientService, 
   PatientFinancial,
+  Appointment,
   feedbackService,
   doctorService,
   serviceService,
@@ -335,5 +336,101 @@ export const usePatientFinancials = (patientId?: string) => {
     error,
     updateFinancials,
     refetch: fetchFinancials
+  }
+}
+
+// Patient appointments hook - fetches upcoming appointments for a patient
+export const usePatientAppointments = (patientId?: string) => {
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchAppointments = async () => {
+    if (!patientId) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      const { data, error: fetchError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('patient_id', patientId)
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true })
+
+      if (fetchError) throw fetchError
+      setAppointments(data as Appointment[] || [])
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch appointments')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [patientId])
+
+  return {
+    appointments,
+    loading,
+    error,
+    refetch: fetchAppointments
+  }
+}
+
+// Bulk fetch all patient appointments - for the patient list view
+export const useAllPatientAppointments = () => {
+  const [appointmentsByPatient, setAppointmentsByPatient] = useState<Record<string, Appointment[]>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchAllAppointments = async () => {
+    try {
+      setLoading(true)
+      const today = new Date().toISOString().split('T')[0]
+      
+      const { data, error: fetchError } = await supabase
+        .from('appointments')
+        .select('*')
+        .gte('appointment_date', today)
+        .in('status', ['scheduled', 'confirmed'])
+        .order('appointment_date', { ascending: true })
+        .order('appointment_time', { ascending: true })
+
+      if (fetchError) throw fetchError
+
+      // Group appointments by patient_id
+      const grouped: Record<string, Appointment[]> = {}
+      ;(data as Appointment[] || []).forEach(apt => {
+        if (apt.patient_id) {
+          if (!grouped[apt.patient_id]) {
+            grouped[apt.patient_id] = []
+          }
+          grouped[apt.patient_id].push(apt)
+        }
+      })
+
+      setAppointmentsByPatient(grouped)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch appointments')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAllAppointments()
+  }, [])
+
+  return {
+    appointmentsByPatient,
+    loading,
+    error,
+    refetch: fetchAllAppointments
   }
 }
