@@ -161,12 +161,14 @@ const PatientManagementSupabase = () => {
   };
 
   const handleSendWhatsApp = (patient: Patient) => {
-    // Get patient's upcoming appointments
-    const patientAppointments = appointmentsByPatient[patient.id] || [];
-    const upcomingAppointment = patientAppointments[0]; // Get the next upcoming appointment
+    // Get patient's appointments (both upcoming and past)
+    const patientAppointments = appointmentsByPatient[patient.id];
+    const upcomingAppointment = patientAppointments?.upcoming?.[0];
+    const lastAppointment = patientAppointments?.past?.[0];
     
     // Format appointment info for message
     let appointmentInfo = '';
+    
     if (upcomingAppointment) {
       const formattedDate = new Date(upcomingAppointment.appointment_date).toLocaleDateString('en-US', {
         weekday: 'long',
@@ -174,14 +176,32 @@ const PatientManagementSupabase = () => {
         month: 'long',
         day: 'numeric'
       });
-      appointmentInfo = `
+      appointmentInfo += `
 📅 *Upcoming Appointment*
 🗓️ *Date:* ${formattedDate}
 ⏰ *Time:* ${upcomingAppointment.appointment_time}
-👨‍⚕️ *Doctor:* ${upcomingAppointment.doctor}
+👨‍⚕️ *Doctor:* Dr. ${upcomingAppointment.doctor}
 🦷 *Service:* ${upcomingAppointment.service_type}
 📋 *Status:* ${upcomingAppointment.status}
 ${upcomingAppointment.notes ? `📝 *Notes:* ${upcomingAppointment.notes}` : ''}`;
+    }
+
+    if (lastAppointment) {
+      const formattedDate = new Date(lastAppointment.appointment_date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      appointmentInfo += `
+
+📜 *Last Appointment*
+🗓️ *Date:* ${formattedDate}
+⏰ *Time:* ${lastAppointment.appointment_time}
+👨‍⚕️ *Doctor:* Dr. ${lastAppointment.doctor}
+🦷 *Service:* ${lastAppointment.service_type}
+📋 *Status:* ${lastAppointment.status}
+${lastAppointment.notes ? `📝 *Notes:* ${lastAppointment.notes}` : ''}`;
     }
 
     // Format patient data for WhatsApp message
@@ -436,7 +456,7 @@ ${appointmentInfo}
                         </div>
                         
                         {/* Upcoming Appointment Info */}
-                        {appointmentsByPatient[patient.id]?.[0] && (
+                        {appointmentsByPatient[patient.id]?.upcoming?.[0] && (
                           <div className="mt-3 p-3 bg-dental-blue-light/50 rounded-lg border border-dental-blue/20">
                             <div className="flex items-center gap-2 mb-2">
                               <Calendar className="w-4 h-4 text-dental-blue" />
@@ -446,26 +466,61 @@ ${appointmentInfo}
                               <div className="flex items-center space-x-2">
                                 <Calendar className="w-3.5 h-3.5 text-dental-gray" />
                                 <span className="text-foreground font-medium">
-                                  {new Date(appointmentsByPatient[patient.id][0].appointment_date).toLocaleDateString()}
+                                  {new Date(appointmentsByPatient[patient.id].upcoming[0].appointment_date).toLocaleDateString()}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Clock className="w-3.5 h-3.5 text-dental-gray" />
                                 <span className="text-foreground font-medium">
-                                  {appointmentsByPatient[patient.id][0].appointment_time}
+                                  {appointmentsByPatient[patient.id].upcoming[0].appointment_time}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Stethoscope className="w-3.5 h-3.5 text-dental-gray" />
                                 <span className="text-foreground font-medium">
-                                  {appointmentsByPatient[patient.id][0].doctor}
+                                  Dr. {appointmentsByPatient[patient.id].upcoming[0].doctor}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <ClipboardList className="w-3.5 h-3.5 text-dental-gray" />
                                 <span className="text-dental-gray">
-                                  {appointmentsByPatient[patient.id][0].service_type}
+                                  {appointmentsByPatient[patient.id].upcoming[0].service_type}
                                 </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Last/Past Appointment Info */}
+                        {appointmentsByPatient[patient.id]?.past?.[0] && (
+                          <div className="mt-2 p-3 bg-muted/50 rounded-lg border border-border">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Clock className="w-4 h-4 text-dental-gray" />
+                              <span className="text-sm font-medium text-dental-gray">Last Appointment</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
+                              <div className="flex items-center space-x-2">
+                                <Calendar className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-muted-foreground">
+                                  {new Date(appointmentsByPatient[patient.id].past[0].appointment_date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Clock className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-muted-foreground">
+                                  {appointmentsByPatient[patient.id].past[0].appointment_time}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Stethoscope className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-muted-foreground">
+                                  Dr. {appointmentsByPatient[patient.id].past[0].doctor}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Badge variant="secondary" className="text-xs">
+                                  {appointmentsByPatient[patient.id].past[0].status}
+                                </Badge>
                               </div>
                             </div>
                           </div>
