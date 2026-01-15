@@ -23,20 +23,23 @@ import {
   Download,
   DollarSign,
   ClipboardList,
-  MessageCircle
+  MessageCircle,
+  Clock,
+  Stethoscope
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePatients } from "@/hooks/useSupabase";
-import { Patient } from "@/lib/supabase";
+import { Patient, Appointment } from "@/lib/supabase";
 import PatientServicesManager from "./PatientServicesManager";
 import PatientFinancialManager from "./PatientFinancialManager";
 import { generatePatientPDF } from "@/utils/pdfGenerator";
-import { usePatientServices, usePatientFinancials } from "@/hooks/useSupabaseExtended";
+import { usePatientServices, usePatientFinancials, useAllPatientAppointments } from "@/hooks/useSupabaseExtended";
 import EnhancedPatientPDFGenerator from "./EnhancedPatientPDFGenerator";
 
 const PatientManagementSupabase = () => {
   const { toast } = useToast();
   const { patients, loading, addPatient, updatePatient, deletePatient } = usePatients();
+  const { appointmentsByPatient, loading: appointmentsLoading } = useAllPatientAppointments();
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -158,6 +161,29 @@ const PatientManagementSupabase = () => {
   };
 
   const handleSendWhatsApp = (patient: Patient) => {
+    // Get patient's upcoming appointments
+    const patientAppointments = appointmentsByPatient[patient.id] || [];
+    const upcomingAppointment = patientAppointments[0]; // Get the next upcoming appointment
+    
+    // Format appointment info for message
+    let appointmentInfo = '';
+    if (upcomingAppointment) {
+      const formattedDate = new Date(upcomingAppointment.appointment_date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      appointmentInfo = `
+📅 *Upcoming Appointment*
+🗓️ *Date:* ${formattedDate}
+⏰ *Time:* ${upcomingAppointment.appointment_time}
+👨‍⚕️ *Doctor:* ${upcomingAppointment.doctor}
+🦷 *Service:* ${upcomingAppointment.service_type}
+📋 *Status:* ${upcomingAppointment.status}
+${upcomingAppointment.notes ? `📝 *Notes:* ${upcomingAppointment.notes}` : ''}`;
+    }
+
     // Format patient data for WhatsApp message
     const message = `
 *Patient Information*
@@ -171,6 +197,7 @@ ${patient.address ? `📍 *Address:* ${patient.address}` : ''}
 ${patient.insurance_info ? `🛡️ *Insurance:* ${patient.insurance_info}` : ''}
 ${patient.medical_history ? `📋 *Medical History:* ${patient.medical_history}` : ''}
 ✅ *Status:* ${patient.status}
+${appointmentInfo}
     `.trim();
 
     // Remove country code formatting and special characters from phone
@@ -407,6 +434,42 @@ ${patient.medical_history ? `📋 *Medical History:* ${patient.medical_history}`
                             </div>
                           )}
                         </div>
+                        
+                        {/* Upcoming Appointment Info */}
+                        {appointmentsByPatient[patient.id]?.[0] && (
+                          <div className="mt-3 p-3 bg-dental-blue-light/50 rounded-lg border border-dental-blue/20">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calendar className="w-4 h-4 text-dental-blue" />
+                              <span className="text-sm font-medium text-dental-blue">Upcoming Appointment</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
+                              <div className="flex items-center space-x-2">
+                                <Calendar className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-foreground font-medium">
+                                  {new Date(appointmentsByPatient[patient.id][0].appointment_date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Clock className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-foreground font-medium">
+                                  {appointmentsByPatient[patient.id][0].appointment_time}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Stethoscope className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-foreground font-medium">
+                                  {appointmentsByPatient[patient.id][0].doctor}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <ClipboardList className="w-3.5 h-3.5 text-dental-gray" />
+                                <span className="text-dental-gray">
+                                  {appointmentsByPatient[patient.id][0].service_type}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         
                         {patient.medical_history && (
                           <div className="mt-2">
