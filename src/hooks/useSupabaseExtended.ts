@@ -382,9 +382,9 @@ export const usePatientAppointments = (patientId?: string) => {
   }
 }
 
-// Bulk fetch all patient appointments - for the patient list view
+// Bulk fetch all patient appointments - for the patient list view (includes past and future)
 export const useAllPatientAppointments = () => {
-  const [appointmentsByPatient, setAppointmentsByPatient] = useState<Record<string, Appointment[]>>({})
+  const [appointmentsByPatient, setAppointmentsByPatient] = useState<Record<string, { upcoming: Appointment[], past: Appointment[] }>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -393,25 +393,43 @@ export const useAllPatientAppointments = () => {
       setLoading(true)
       const today = new Date().toISOString().split('T')[0]
       
+      // Fetch ALL appointments (not just upcoming)
       const { data, error: fetchError } = await supabase
         .from('appointments')
         .select('*')
-        .gte('appointment_date', today)
-        .in('status', ['scheduled', 'confirmed'])
-        .order('appointment_date', { ascending: true })
-        .order('appointment_time', { ascending: true })
+        .order('appointment_date', { ascending: false })
+        .order('appointment_time', { ascending: false })
 
       if (fetchError) throw fetchError
 
-      // Group appointments by patient_id
-      const grouped: Record<string, Appointment[]> = {}
+      // Group appointments by patient_id, separating upcoming and past
+      const grouped: Record<string, { upcoming: Appointment[], past: Appointment[] }> = {}
       ;(data as Appointment[] || []).forEach(apt => {
         if (apt.patient_id) {
           if (!grouped[apt.patient_id]) {
-            grouped[apt.patient_id] = []
+            grouped[apt.patient_id] = { upcoming: [], past: [] }
           }
-          grouped[apt.patient_id].push(apt)
+          
+          // Check if appointment is upcoming or past
+          const isUpcoming = apt.appointment_date >= today && 
+            (apt.status === 'scheduled' || apt.status === 'confirmed')
+          
+          if (isUpcoming) {
+            grouped[apt.patient_id].upcoming.push(apt)
+          } else {
+            grouped[apt.patient_id].past.push(apt)
+          }
         }
+      })
+
+      // Sort upcoming appointments by date ascending (nearest first)
+      Object.values(grouped).forEach(patientAppts => {
+        patientAppts.upcoming.sort((a, b) => {
+          const dateA = `${a.appointment_date}T${a.appointment_time}`
+          const dateB = `${b.appointment_date}T${b.appointment_time}`
+          return dateA.localeCompare(dateB)
+        })
+        // Past appointments already sorted by date descending (most recent first)
       })
 
       setAppointmentsByPatient(grouped)
