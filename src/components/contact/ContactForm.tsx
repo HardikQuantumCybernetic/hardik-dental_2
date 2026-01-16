@@ -151,14 +151,19 @@ export const ContactForm = () => {
                 <Label htmlFor="contactPhone" className="text-dental-blue font-medium">
                   Phone Number
                 </Label>
-                <Input 
-                  id="contactPhone" 
-                  type="tel" 
-                  className="border-dental-blue-light focus:border-dental-blue"
-                  placeholder="(555) 123-4567"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                />
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-dental-blue-light bg-muted text-muted-foreground text-sm">
+                    +91
+                  </span>
+                  <Input 
+                    id="contactPhone" 
+                    type="tel" 
+                    className="border-dental-blue-light focus:border-dental-blue rounded-l-none"
+                    placeholder="9876543210"
+                    value={formData.phone.replace(/^\+91/, '')}
+                    onChange={(e) => setFormData({...formData, phone: `+91${e.target.value.replace(/^\+91/, '')}`})}
+                  />
+                </div>
               </div>
             </div>
 

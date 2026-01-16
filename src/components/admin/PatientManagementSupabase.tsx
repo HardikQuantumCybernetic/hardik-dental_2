@@ -220,8 +220,11 @@ ${patient.medical_history ? `📋 *Medical History:* ${patient.medical_history}`
 ${appointmentInfo}
     `.trim();
 
-    // Remove country code formatting and special characters from phone
-    const cleanPhone = patient.phone.replace(/[^\d]/g, '');
+    // Remove special characters from phone and ensure +91 prefix for Indian numbers
+    let cleanPhone = patient.phone.replace(/[^\d+]/g, '');
+    if (!cleanPhone.startsWith('+')) {
+      cleanPhone = cleanPhone.startsWith('91') ? `+${cleanPhone}` : `+91${cleanPhone}`;
+    }
     
     // Create WhatsApp URL with pre-filled message
     const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
@@ -307,16 +310,22 @@ ${appointmentInfo}
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                      required
-                      className="border-dental-blue-light focus:border-dental-blue"
-                    />
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-dental-blue-light bg-muted text-muted-foreground text-sm">
+                        +91
+                      </span>
+                      <Input
+                        id="phone"
+                        value={formData.phone.replace(/^\+91/, '')}
+                        onChange={(e) => setFormData({...formData, phone: `+91${e.target.value.replace(/^\+91/, '')}`})}
+                        required
+                        placeholder="9876543210"
+                        className="border-dental-blue-light focus:border-dental-blue rounded-l-none"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="date_of_birth">Date of Birth</Label>

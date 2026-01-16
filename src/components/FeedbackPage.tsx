@@ -447,14 +447,19 @@ const FeedbackPage: React.FC = () => {
                     </div>
                     <div>
                       <Label htmlFor="phone" className="text-dental-blue">Phone</Label>
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="(808) 095-0921"
-                        value={feedback.phone}
-                        onChange={(e) => setFeedback({ ...feedback, phone: e.target.value })}
-                        className="border-dental-blue-light focus:border-dental-blue"
-                      />
+                      <div className="flex">
+                        <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-dental-blue-light bg-muted text-muted-foreground text-sm">
+                          +91
+                        </span>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="9876543210"
+                          value={feedback.phone.replace(/^\+91/, '')}
+                          onChange={(e) => setFeedback({ ...feedback, phone: `+91${e.target.value.replace(/^\+91/, '')}` })}
+                          className="border-dental-blue-light focus:border-dental-blue rounded-l-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>

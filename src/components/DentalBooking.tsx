@@ -270,15 +270,22 @@ const DentalBooking = () => {
                   onValueChange={(value, isValid) => updateFormField('email', value, isValid)}
                   className="border-dental-blue-light focus:border-dental-blue"
                 />
-                <ValidatedInput
-                  id="phone"
-                  label="Phone Number"
-                  type="tel"
-                  placeholder="(555) 123-4567"
-                  validation={{ type: 'phone', required: true, minLength: 10 }}
-                  onValueChange={(value, isValid) => updateFormField('phone', value, isValid)}
-                  className="border-dental-blue-light focus:border-dental-blue"
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-dental-blue font-medium">Phone Number</Label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-dental-blue-light bg-muted text-muted-foreground text-sm">
+                      +91
+                    </span>
+                    <ValidatedInput
+                      id="phone"
+                      type="tel"
+                      placeholder="9876543210"
+                      validation={{ type: 'phone', required: true, minLength: 10 }}
+                      onValueChange={(value, isValid) => updateFormField('phone', value.startsWith('+91') ? value : `+91${value}`, isValid)}
+                      className="border-dental-blue-light focus:border-dental-blue rounded-l-none flex-1"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Appointment Details */}
