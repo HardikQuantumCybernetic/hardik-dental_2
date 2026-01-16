@@ -58,7 +58,7 @@ const AppointmentManagement = () => {
   };
 
   const handleSendWhatsApp = (appointment: any) => {
-    const phone = appointment.patient_phone?.replace(/[\s\-\(\)]/g, '') || '';
+    let phone = appointment.patient_phone?.replace(/[\s\-\(\)]/g, '') || '';
     
     if (!phone) {
       toast({
@@ -67,6 +67,11 @@ const AppointmentManagement = () => {
         variant: "destructive"
       });
       return;
+    }
+
+    // Ensure +91 prefix for Indian numbers
+    if (!phone.startsWith('+')) {
+      phone = phone.startsWith('91') ? `+${phone}` : `+91${phone}`;
     }
 
     const message = `🦷 *Dental Appointment Reminder*
@@ -285,24 +290,10 @@ Thank you for choosing our dental clinic!`;
                         <p className="text-dental-gray">{appointment.service_type}</p>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start sm:self-center">
-                        <Badge className={`${getStatusColor(appointment.status)} flex items-center space-x-1 w-fit`}>
-                          {getStatusIcon(appointment.status)}
-                          <span className="capitalize">{appointment.status}</span>
-                        </Badge>
-
-                        {/* Prominent WhatsApp icon button */}
-                        <Button
-                          type="button"
-                          size="icon"
-                          className="bg-green-600 hover:bg-green-700 text-white h-9 w-9"
-                          onClick={() => handleSendWhatsApp(appointment)}
-                          aria-label="Send appointment details on WhatsApp"
-                          title="Send WhatsApp"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Badge className={`${getStatusColor(appointment.status)} flex items-center space-x-1 w-fit`}>
+                        {getStatusIcon(appointment.status)}
+                        <span className="capitalize">{appointment.status}</span>
+                      </Badge>
                     </div>
                   </div>
                   

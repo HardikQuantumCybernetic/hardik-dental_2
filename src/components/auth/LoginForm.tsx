@@ -379,15 +379,17 @@ const LoginForm = ({ onLogin }: LoginFormProps) => {
                   <Label htmlFor="phone" className="text-dental-gray font-medium">
                     Phone Number
                   </Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-dental-gray" />
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-dental-blue-light bg-muted text-muted-foreground text-sm">
+                      <Phone className="h-4 w-4 mr-1" />+91
+                    </span>
                     <Input
                       id="phone"
                       type="tel"
-                      value={signupData.phone}
-                      onChange={(e) => setSignupData({...signupData, phone: e.target.value})}
-                      placeholder="Enter your phone number"
-                      className="pl-10 border-dental-blue-light focus:border-dental-blue"
+                      value={signupData.phone.replace(/^\+91/, '')}
+                      onChange={(e) => setSignupData({...signupData, phone: `+91${e.target.value.replace(/^\+91/, '')}`})}
+                      placeholder="9876543210"
+                      className="border-dental-blue-light focus:border-dental-blue rounded-l-none"
                       required
                     />
                   </div>

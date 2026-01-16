@@ -299,15 +299,17 @@ const AuthenticationForm: React.FC = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="signup-phone">Phone Number</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-dental-gray" />
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
+                        <Phone className="h-4 w-4 mr-1" />+91
+                      </span>
                       <Input
                         id="signup-phone"
                         type="tel"
-                        placeholder="(555) 123-4567"
-                        value={formData.phone}
-                        onChange={(e) => updateFormData('phone', e.target.value)}
-                        className="pl-10"
+                        placeholder="9876543210"
+                        value={formData.phone.replace(/^\+91/, '')}
+                        onChange={(e) => updateFormData('phone', `+91${e.target.value.replace(/^\+91/, '')}`)}
+                        className="rounded-l-none"
                       />
                     </div>
                   </div>
