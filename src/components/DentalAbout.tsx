@@ -73,7 +73,7 @@ const DentalAbout = () => {
         <div className="text-center mb-16 animate-fade-in">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6 font-inter">
             About 
-            <span className="bg-gradient-to-r from-dental-blue to-dental-mint bg-clip-text text-transparent"> SmileCare Dental</span>
+            <span className="bg-gradient-to-r from-dental-blue to-dental-mint bg-clip-text text-transparent"> Hardik Dental</span>
           </h2>
           <p className="text-lg text-dental-gray max-w-3xl mx-auto leading-relaxed">
             For over a decade, we've been dedicated to providing exceptional dental care 
@@ -109,7 +109,7 @@ const DentalAbout = () => {
             <h3 className="text-3xl font-bold text-foreground mb-6 font-inter">Our Story</h3>
             <div className="space-y-4 text-dental-gray leading-relaxed">
               <p>
-                SmileCare Dental was founded with a simple mission: to provide exceptional dental care 
+                Hardik Dental was founded with a simple mission: to provide exceptional dental care 
                 in a comfortable, welcoming environment. What started as a small practice has grown 
                 into a comprehensive dental clinic serving hundreds of satisfied patients.
               </p>
