@@ -243,41 +243,6 @@ Thank you for choosing our dental clinic!`;
         </Dialog>
       </div>
 
-      {/* Bulk Actions Bar */}
-      {appointments.length > 0 && (
-        <Card className="border-green-200 bg-green-50/50">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <Checkbox
-                  id="select-all"
-                  checked={selectedAppointments.size === appointments.length && appointments.length > 0}
-                  onCheckedChange={toggleSelectAll}
-                />
-                <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
-                  {selectedAppointments.size === appointments.length 
-                    ? "Deselect All" 
-                    : "Select All"}
-                </label>
-                {selectedAppointments.size > 0 && (
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    {selectedAppointments.size} selected
-                  </Badge>
-                )}
-              </div>
-
-              <Button
-                onClick={handleBulkWhatsApp}
-                disabled={selectedAppointments.size === 0}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <Send className="w-4 h-4 mr-2" />
-                Send Bulk WhatsApp ({selectedAppointments.size})
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {appointments.length === 0 ? (
         <Card className="border-dental-blue-light">
