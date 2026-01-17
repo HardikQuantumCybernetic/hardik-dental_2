@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ValidatedInput } from "@/components/ui/validated-input";
@@ -25,6 +25,39 @@ const DentalBooking = () => {
     message: ''
   });
   const { toast } = useToast();
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
+  // Fetch booked time slots for the selected date and doctor
+  useEffect(() => {
+    const fetchBookedSlots = async () => {
+      if (!formData.date || !formData.doctor) {
+        setBookedSlots([]);
+        return;
+      }
+
+      setLoadingSlots(true);
+      try {
+        const { data, error } = await supabase
+          .from('appointments')
+          .select('appointment_time')
+          .eq('appointment_date', formData.date)
+          .eq('doctor', formData.doctor)
+          .not('status', 'eq', 'cancelled'); // Don't count cancelled appointments
+
+        if (error) throw error;
+
+        const slots = data?.map(apt => apt.appointment_time) || [];
+        setBookedSlots(slots);
+      } catch (error) {
+        console.error('Error fetching booked slots:', error);
+      } finally {
+        setLoadingSlots(false);
+      }
+    };
+
+    fetchBookedSlots();
+  }, [formData.date, formData.doctor]);
 
   const updateFormField = (field: string, value: string, isValid: boolean) => {
     setFormData(prev => ({
@@ -308,19 +341,37 @@ const DentalBooking = () => {
                   <Label htmlFor="time" className="text-dental-blue font-medium flex items-center space-x-2">
                     <Clock className="w-4 h-4" />
                     <span>Preferred Time</span>
+                    {loadingSlots && <span className="text-xs text-muted-foreground">(Loading...)</span>}
                   </Label>
-                  <Select required onValueChange={(value) => updateFormValue('time', value)}>
+                  <Select 
+                    required 
+                    onValueChange={(value) => updateFormValue('time', value)}
+                    disabled={!formData.date || !formData.doctor}
+                  >
                     <SelectTrigger className="border-dental-blue-light focus:border-dental-blue">
-                      <SelectValue placeholder="Select time" />
+                      <SelectValue placeholder={!formData.date || !formData.doctor ? "Select date & doctor first" : "Select time"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {timeSlots.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
+                      {timeSlots.map((t) => {
+                        const isBooked = bookedSlots.includes(t.value);
+                        return (
+                          <SelectItem 
+                            key={t.value} 
+                            value={t.value}
+                            disabled={isBooked}
+                            className={isBooked ? 'text-muted-foreground line-through' : ''}
+                          >
+                            {t.label} {isBooked && '(Booked)'}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
+                  {formData.date && formData.doctor && bookedSlots.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {bookedSlots.length} slot(s) already booked for this date with {formData.doctor}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="service" className="text-dental-blue font-medium">
@@ -343,7 +394,11 @@ const DentalBooking = () => {
                   <Label htmlFor="doctor" className="text-dental-blue font-medium">
                     Preferred Doctor
                   </Label>
-                  <Select required onValueChange={(value) => updateFormValue('doctor', value)}>
+                  <Select required onValueChange={(value) => {
+                    updateFormValue('doctor', value);
+                    // Reset time when doctor changes as slots may differ
+                    updateFormValue('time', '');
+                  }}>
                     <SelectTrigger className="border-dental-blue-light focus:border-dental-blue">
                       <SelectValue placeholder="Select doctor" />
                     </SelectTrigger>
