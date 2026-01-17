@@ -122,15 +122,15 @@ Thank you for choosing our dental clinic!`;
   };
 
   // Send bulk WhatsApp reminders
-  const handleBulkWhatsApp = () => {
+  const handleBulkWhatsApp = async () => {
     const selected = appointments.filter(a => selectedAppointments.has(a.id));
-    const withPhone = selected.filter(a => a.patient_phone);
-    const withoutPhone = selected.filter(a => !a.patient_phone);
+    const withPhone = selected.filter(a => a.patient_phone && a.patient_phone.trim() !== '');
+    const withoutPhone = selected.filter(a => !a.patient_phone || a.patient_phone.trim() === '');
 
     if (withPhone.length === 0) {
       toast({
         title: "No valid phone numbers",
-        description: "None of the selected appointments have phone numbers.",
+        description: "None of the selected appointments have phone numbers. Please ensure patient records include phone numbers.",
         variant: "destructive"
       });
       return;
@@ -144,17 +144,42 @@ Thank you for choosing our dental clinic!`;
       });
     }
 
-    // Open WhatsApp for each selected appointment (with a small delay to avoid popup blocking)
-    withPhone.forEach((appointment, index) => {
-      setTimeout(() => {
-        handleSendWhatsApp(appointment);
-      }, index * 500); // 500ms delay between each
-    });
-
     toast({
       title: "Bulk WhatsApp Started",
       description: `Opening ${withPhone.length} WhatsApp message(s)...`,
     });
+
+    // Open WhatsApp for each selected appointment with delay
+    for (let i = 0; i < withPhone.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 500));
+      
+      const appointment = withPhone[i];
+      let phone = appointment.patient_phone?.replace(/[\s\-\(\)]/g, '') || '';
+      
+      // Ensure +91 prefix for Indian numbers
+      if (!phone.startsWith('+')) {
+        phone = phone.startsWith('91') ? `+${phone}` : `+91${phone}`;
+      }
+
+      const message = `🦷 *Dental Appointment Reminder*
+
+Hello ${appointment.patient_name || 'Patient'},
+
+Your appointment details:
+📅 Date: ${appointment.appointment_date}
+⏰ Time: ${appointment.appointment_time}
+👨‍⚕️ Doctor: Dr. ${appointment.doctor}
+🏥 Service: ${appointment.service_type}
+📋 Status: ${appointment.status}
+${appointment.notes ? `📝 Notes: ${appointment.notes}` : ''}
+
+Please arrive 10 minutes before your scheduled time.
+
+Thank you for choosing our dental clinic!`;
+
+      const whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, '_blank');
+    }
 
     // Clear selection after sending
     setSelectedAppointments(new Set());
