@@ -139,14 +139,14 @@ const DentalFooter = () => {
                   <Phone className="w-5 h-5 text-dental-blue-light flex-shrink-0" />
                   <div>
                     <button 
-                      onClick={() => handlePhoneCall("(555) 123-4567")}
+                      onClick={() => handlePhoneCall("8080950921")}
                       className="text-dental-blue-light hover:text-white transition-colors"
                     >
                       Main: (555) 123-4567
                     </button>
                     <br />
                     <button 
-                      onClick={() => handlePhoneCall("(555) 123-4568")}
+                      onClick={() => handlePhoneCall("8080950921")}
                       className="text-dental-blue-light hover:text-white transition-colors"
                     >
                       Emergency: (555) 123-4568
