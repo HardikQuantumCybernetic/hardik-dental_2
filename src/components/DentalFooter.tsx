@@ -49,9 +49,9 @@ const DentalFooter = () => {
             <div className="lg:col-span-1">
             <Link to="/" className="flex items-center space-x-2 mb-6">
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
-                <span className="text-dental-blue font-bold text-lg">S</span>
+                <span className="text-dental-blue font-bold text-lg">H</span>
               </div>
-              <span className="text-xl font-bold font-inter">SmileCare Dental</span>
+              <span className="text-xl font-bold font-inter">Hardik Dental</span>
             </Link>
               <p className="text-dental-blue-light mb-6 leading-relaxed">
                 Your trusted dental care provider for over 10 years. We're committed to helping you achieve 
@@ -181,7 +181,7 @@ const DentalFooter = () => {
         <div className="border-t border-white/20 py-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="text-dental-blue-light text-sm">
-              © 2024 SmileCare Dental. All rights reserved.
+              © {new Date().getFullYear()} Hardik Dental. All rights reserved.
             </div>
             
             <div className="flex items-center space-x-6 text-sm">

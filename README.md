@@ -1,11 +1,15 @@
 # 🦷 Hardik Dental - Dental Clinic Management System
 
-A modern, full-stack dental clinic management system built with React, TypeScript, and Supabase. This application provides comprehensive patient management, appointment scheduling, feedback collection, and administrative tools for dental practices.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-18.3.1-61DAFB?logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-2.x-3ECF8E?logo=supabase)](https://supabase.com/)
+[![Clerk](https://img.shields.io/badge/Clerk-Auth-6C47FF?logo=clerk)](https://clerk.com/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![React](https://img.shields.io/badge/React-18.3.1-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)
-![Supabase](https://img.shields.io/badge/Supabase-2.x-green)
+A modern, full-stack dental clinic management system built with React, TypeScript, and Supabase. This open-source application provides comprehensive patient management, appointment scheduling, feedback collection, and administrative tools for dental practices.
+
+> **🌟 Star this repo** if you find it useful! Your support helps us improve and maintain this project.
 
 ## ✨ Features
 
@@ -618,11 +622,25 @@ For support, email hardikjadhav307@gmail.com or open an issue in the repository.
 
 ## 🔗 Links
 
-- [Live Demo](https://secondlast.vercel.app/)
-- [Documentation]( https://github.com/HardikQuantumCybernetic/hardik-dental)
+- [Live Demo](https://hardik306-72.lovable.app)
+- [Documentation](https://github.com/HardikQuantumCybernetic/hardik-dental)
 - [Bug Reports](https://github.com/HardikQuantumCybernetic/hardik-dental/issues)
 - [Feature Requests](https://github.com/HardikQuantumCybernetic/hardik-dental/issues)
+
+## 📊 Project Status
+
+This project is actively maintained and open for contributions. Current priorities:
+
+- ✅ Core patient management
+- ✅ Appointment scheduling with time slot blocking
+- ✅ WhatsApp integration for notifications
+- ✅ Admin dashboard with analytics
+- 🔄 Email notification system (planned)
+- 🔄 SMS reminders (planned)
+- 🔄 Multi-language support (planned)
 
 ---
 
 Made with ❤️ by the Hardik Dental team
+
+**Open Source** • **MIT Licensed** • **Built with Lovable**
