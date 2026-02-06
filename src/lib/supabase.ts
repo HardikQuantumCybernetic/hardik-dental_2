@@ -1,8 +1,25 @@
+/**
+ * ============================================================================
+ * Supabase/API Service Layer
+ * ============================================================================
+ * This file provides a unified API layer that works with both:
+ * 1. Supabase (for Lovable development/preview)
+ * 2. PHP Backend (for VPS production deployment)
+ * 
+ * The USE_PHP_BACKEND flag controls which backend to use.
+ * ============================================================================
+ */
+
 import { supabase } from '@/integrations/supabase/client'
 
-export { supabase }
+// Backend mode flag - set to true for VPS/PHP deployment
+const USE_PHP_BACKEND = import.meta.env.VITE_USE_PHP_BACKEND === 'true';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-// Additional types for new tables
+// ============================================================================
+// Types
+// ============================================================================
+
 export type Doctor = {
   id: string
   created_at: string
@@ -62,7 +79,6 @@ export type PatientFinancial = {
   notes: string | null
 }
 
-// Database types for the dental practice
 export type Patient = {
   id: string
   created_at: string
@@ -100,219 +116,393 @@ export type Treatment = {
   status: 'planned' | 'in-progress' | 'completed'
 }
 
-// Helper functions for database operations
+// Re-export supabase for components that still need direct access
+export { supabase }
+
+// ============================================================================
+// PHP API Helper (for VPS deployment)
+// ============================================================================
+
+async function phpApiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const token = localStorage.getItem('auth_token');
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return data.data ?? data;
+}
+
+// ============================================================================
+// Patient Service
+// ============================================================================
+
 export const patientService = {
-  async getAll() {
-    console.log('🔍 Fetching patients from Supabase...')
+  async getAll(): Promise<Patient[]> {
+    console.log('🔍 Fetching patients...');
     
-    // Check authentication status
-    const { data: authData } = await supabase.auth.getUser()
-    console.log('🔐 Auth status:', authData?.user ? 'Authenticated' : 'Not authenticated')
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Patient[]>('/patients');
+    }
+    
+    const { data: authData } = await supabase.auth.getUser();
+    console.log('🔐 Auth status:', authData?.user ? 'Authenticated' : 'Not authenticated');
     
     const { data, error } = await supabase
       .from('patients')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
     
-    console.log('📊 Patients query result:', { data, error, count: data?.length })
+    console.log('📊 Patients query result:', { data, error, count: data?.length });
     
     if (error) {
-      console.error('❌ Patient fetch error:', error)
-      throw error
+      console.error('❌ Patient fetch error:', error);
+      throw error;
     }
-    return data as Patient[]
+    return data as Patient[];
   },
 
-  async create(patient: Omit<Patient, 'id' | 'created_at' | 'patient_id'>) {
+  async create(patient: Omit<Patient, 'id' | 'created_at' | 'patient_id'>): Promise<Patient> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Patient>('/patients', {
+        method: 'POST',
+        body: JSON.stringify(patient),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('patients')
       .insert([patient])
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as Patient
+    if (error) throw error;
+    return data as Patient;
   },
 
-  async update(id: string, updates: Partial<Patient>) {
+  async update(id: string, updates: Partial<Patient>): Promise<Patient> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Patient>(`/patients?id=${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('patients')
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as Patient
+    if (error) throw error;
+    return data as Patient;
   },
 
-  async delete(id: string) {
+  async delete(id: string): Promise<void> {
+    if (USE_PHP_BACKEND) {
+      await phpApiRequest<null>(`/patients?id=${id}`, { method: 'DELETE' });
+      return;
+    }
+    
     const { error } = await supabase
       .from('patients')
       .delete()
-      .eq('id', id)
+      .eq('id', id);
     
-    if (error) throw error
+    if (error) throw error;
+  },
+
+  async getByEmail(email: string): Promise<Patient | null> {
+    if (USE_PHP_BACKEND) {
+      try {
+        return await phpApiRequest<Patient>(`/patients?email=${encodeURIComponent(email)}`);
+      } catch {
+        return null;
+      }
+    }
+    
+    const { data, error } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('email', email)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') throw error;
+    return data as Patient | null;
   }
-}
+};
+
+// ============================================================================
+// Appointment Service
+// ============================================================================
 
 export const appointmentService = {
-  async getAll() {
+  async getAll(): Promise<Appointment[]> {
+    console.log('🔍 Fetching appointments...');
+    
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Appointment[]>('/appointments');
+    }
+    
     try {
-      console.log('🔍 Fetching appointments from Supabase...')
+      const { data: authData } = await supabase.auth.getUser();
+      console.log('🔐 Auth status for appointments:', authData?.user ? 'Authenticated' : 'Not authenticated');
       
-      // Check authentication status
-      const { data: authData } = await supabase.auth.getUser()
-      console.log('🔐 Auth status for appointments:', authData?.user ? 'Authenticated' : 'Not authenticated')
-      
-      // Get appointments with patient data using a simpler approach
       const { data: appointments, error: appointmentsError } = await supabase
         .from('appointments')
         .select('*')
-        .order('appointment_date', { ascending: true })
+        .order('appointment_date', { ascending: true });
       
-      console.log('📊 Appointments query result:', { appointments, appointmentsError, count: appointments?.length })
+      console.log('📊 Appointments query result:', { appointments, appointmentsError, count: appointments?.length });
       
       if (appointmentsError) {
-        console.error('Appointments error:', appointmentsError)
-        throw appointmentsError
+        console.error('Appointments error:', appointmentsError);
+        throw appointmentsError;
       }
 
-      // Get patient data separately and merge
       const { data: patients, error: patientsError } = await supabase
         .from('patients')
-        .select('id, name, email, phone')
+        .select('id, name, email, phone');
       
       if (patientsError) {
-        console.error('Patients error:', patientsError)
-        throw patientsError
+        console.error('Patients error:', patientsError);
+        throw patientsError;
       }
 
-      // Merge appointment and patient data
       const appointmentsWithPatients = appointments?.map(appointment => {
-        const patient = patients?.find(p => p.id === appointment.patient_id)
+        const patient = patients?.find(p => p.id === appointment.patient_id);
         return {
           ...appointment,
           patient_name: patient?.name || 'Unknown Patient',
           patient_email: patient?.email,
           patient_phone: patient?.phone
-        }
-      }) || []
+        };
+      }) || [];
 
-      console.log('Merged appointments data:', appointmentsWithPatients)
-      return appointmentsWithPatients
+      console.log('Merged appointments data:', appointmentsWithPatients);
+      return appointmentsWithPatients as (Appointment & { patient_name: string; patient_email?: string; patient_phone?: string })[];
     } catch (error) {
-      console.error('Error in appointmentService.getAll:', error)
-      throw error
+      console.error('Error in appointmentService.getAll:', error);
+      throw error;
     }
   },
 
-  async create(appointment: Omit<Appointment, 'id' | 'created_at'>) {
+  async create(appointment: Omit<Appointment, 'id' | 'created_at'>): Promise<Appointment> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Appointment>('/appointments', {
+        method: 'POST',
+        body: JSON.stringify(appointment),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('appointments')
       .insert([appointment])
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as Appointment
+    if (error) throw error;
+    return data as Appointment;
   },
 
-  async update(id: string, updates: Partial<Appointment>) {
+  async update(id: string, updates: Partial<Appointment>): Promise<Appointment> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Appointment>(`/appointments?id=${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('appointments')
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as Appointment
+    if (error) throw error;
+    return data as Appointment;
   },
 
-  async delete(id: string) {
+  async delete(id: string): Promise<void> {
+    if (USE_PHP_BACKEND) {
+      await phpApiRequest<null>(`/appointments?id=${id}`, { method: 'DELETE' });
+      return;
+    }
+    
     const { error } = await supabase
       .from('appointments')
       .delete()
-      .eq('id', id)
+      .eq('id', id);
     
-    if (error) throw error
-  }
-}
+    if (error) throw error;
+  },
 
-// Feedback service
+  async getByDateAndDoctor(date: string, doctor: string): Promise<Appointment[]> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Appointment[]>(
+        `/appointments?date=${date}&doctor=${encodeURIComponent(doctor)}`
+      );
+    }
+    
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('appointment_date', date)
+      .eq('doctor', doctor)
+      .neq('status', 'cancelled');
+    
+    if (error) throw error;
+    return data as Appointment[];
+  }
+};
+
+// ============================================================================
+// Feedback Service
+// ============================================================================
+
 export const feedbackService = {
-  async getAll() {
-    console.log('🔍 Fetching feedback from Supabase...')
+  async getAll(): Promise<Feedback[]> {
+    console.log('🔍 Fetching feedback...');
+    
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Feedback[]>('/feedback');
+    }
     
     const { data, error } = await supabase
       .from('feedback')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
     
-    console.log('📊 Feedback query result:', { data, error, count: data?.length })
+    console.log('📊 Feedback query result:', { data, error, count: data?.length });
     
     if (error) {
-      console.error('❌ Feedback fetch error:', error)
-      throw error
+      console.error('❌ Feedback fetch error:', error);
+      throw error;
     }
-    return data as Feedback[]
+    return data as Feedback[];
   },
 
-  async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>) {
+  async create(feedback: Omit<Feedback, 'id' | 'created_at' | 'updated_at'>): Promise<Feedback> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Feedback>('/feedback', {
+        method: 'POST',
+        body: JSON.stringify(feedback),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('feedback')
       .insert([feedback])
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as Feedback
+    if (error) throw error;
+    return data as Feedback;
   },
 
-  async update(id: string, updates: Partial<Feedback>) {
+  async update(id: string, updates: Partial<Feedback>): Promise<Feedback> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Feedback>(`/feedback?id=${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('feedback')
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as Feedback
-  }
-}
+    if (error) throw error;
+    return data as Feedback;
+  },
 
-// Doctor service
+  async delete(id: string): Promise<void> {
+    if (USE_PHP_BACKEND) {
+      await phpApiRequest<null>(`/feedback?id=${id}`, { method: 'DELETE' });
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('feedback')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================================================
+// Doctor Service
+// ============================================================================
+
 export const doctorService = {
-  async getAll() {
+  async getAll(): Promise<Doctor[]> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Doctor[]>('/doctors');
+    }
+    
     const { data, error } = await supabase
       .from('doctors')
       .select('*')
       .eq('is_active', true)
-      .order('name', { ascending: true })
+      .order('name', { ascending: true });
     
-    if (error) throw error
-    return data as Doctor[]
+    if (error) throw error;
+    return data as Doctor[];
   }
-}
+};
 
-// Service management
+// ============================================================================
+// Service Management
+// ============================================================================
+
 export const serviceService = {
-  async getAll() {
+  async getAll(): Promise<Service[]> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Service[]>('/services');
+    }
+    
     const { data, error } = await supabase
       .from('services')
       .select('*')
-      .order('name', { ascending: true })
+      .order('name', { ascending: true });
     
-    if (error) throw error
-    return data as Service[]
+    if (error) throw error;
+    return data as Service[];
   }
-}
+};
 
-// Patient services (todo list)
+// ============================================================================
+// Patient Services (Todo List)
+// ============================================================================
+
 export const patientServiceService = {
-  async getByPatientId(patientId: string) {
+  async getByPatientId(patientId: string): Promise<PatientService[]> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<PatientService[]>(`/patient-services?patient_id=${patientId}`);
+    }
+    
     const { data, error } = await supabase
       .from('patient_services')
       .select(`
@@ -320,94 +510,242 @@ export const patientServiceService = {
         service:services(name, description)
       `)
       .eq('patient_id', patientId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false });
     
-    if (error) throw error
+    if (error) throw error;
     
     return data.map(item => ({
       ...item,
       service_name: item.service?.name,
       service_description: item.service?.description
-    })) as PatientService[]
+    })) as PatientService[];
   },
 
-  async create(patientService: Omit<PatientService, 'id' | 'created_at' | 'updated_at'>) {
+  async create(patientService: Omit<PatientService, 'id' | 'created_at' | 'updated_at'>): Promise<PatientService> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<PatientService>('/patient-services', {
+        method: 'POST',
+        body: JSON.stringify(patientService),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('patient_services')
       .insert([patientService])
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as PatientService
+    if (error) throw error;
+    return data as PatientService;
   },
 
-  async update(id: string, updates: Partial<PatientService>) {
+  async update(id: string, updates: Partial<PatientService>): Promise<PatientService> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<PatientService>(`/patient-services?id=${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('patient_services')
       .update(updates)
       .eq('id', id)
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as PatientService
+    if (error) throw error;
+    return data as PatientService;
   },
 
-  async delete(id: string) {
+  async delete(id: string): Promise<void> {
+    if (USE_PHP_BACKEND) {
+      await phpApiRequest<null>(`/patient-services?id=${id}`, { method: 'DELETE' });
+      return;
+    }
+    
     const { error } = await supabase
       .from('patient_services')
       .delete()
-      .eq('id', id)
+      .eq('id', id);
     
-    if (error) throw error
+    if (error) throw error;
   }
-}
+};
 
-// Patient financials service
+// ============================================================================
+// Patient Financials Service
+// ============================================================================
+
 export const patientFinancialService = {
-  async getByPatientId(patientId: string) {
+  async getByPatientId(patientId: string): Promise<PatientFinancial | null> {
+    if (USE_PHP_BACKEND) {
+      try {
+        return await phpApiRequest<PatientFinancial>(`/financials?patient_id=${patientId}`);
+      } catch {
+        return null;
+      }
+    }
+    
     const { data, error } = await supabase
       .from('patient_financials')
       .select('*')
       .eq('patient_id', patientId)
-      .single()
+      .single();
     
-    if (error && error.code !== 'PGRST116') throw error
-    return data as PatientFinancial | null
+    if (error && error.code !== 'PGRST116') throw error;
+    return data as PatientFinancial | null;
   },
 
-  async create(financials: Omit<PatientFinancial, 'id' | 'created_at' | 'updated_at'>) {
+  async create(financials: Omit<PatientFinancial, 'id' | 'created_at' | 'updated_at'>): Promise<PatientFinancial> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<PatientFinancial>('/financials', {
+        method: 'POST',
+        body: JSON.stringify(financials),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('patient_financials')
       .insert([financials])
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as PatientFinancial
+    if (error) throw error;
+    return data as PatientFinancial;
   },
 
-  async update(patientId: string, updates: Partial<PatientFinancial>) {
+  async update(patientId: string, updates: Partial<PatientFinancial>): Promise<PatientFinancial> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<PatientFinancial>(`/financials?patient_id=${patientId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
     const { data, error } = await supabase
       .from('patient_financials')
       .update(updates)
       .eq('patient_id', patientId)
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as PatientFinancial
+    if (error) throw error;
+    return data as PatientFinancial;
   },
 
-  async upsert(financials: Omit<PatientFinancial, 'id' | 'created_at' | 'updated_at'>) {
+  async upsert(financials: Omit<PatientFinancial, 'id' | 'created_at' | 'updated_at'>): Promise<PatientFinancial> {
+    if (USE_PHP_BACKEND) {
+      // Try to get existing first, then create or update
+      const existing = await this.getByPatientId(financials.patient_id);
+      if (existing) {
+        return this.update(financials.patient_id, financials);
+      }
+      return this.create(financials);
+    }
+    
     const { data, error } = await supabase
       .from('patient_financials')
       .upsert([financials], { onConflict: 'patient_id' })
       .select()
-      .single()
+      .single();
     
-    if (error) throw error
-    return data as PatientFinancial
+    if (error) throw error;
+    return data as PatientFinancial;
   }
-}
+};
+
+// ============================================================================
+// Treatment Service
+// ============================================================================
+
+export const treatmentService = {
+  async getAll(): Promise<Treatment[]> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Treatment[]>('/treatments');
+    }
+    
+    const { data, error } = await supabase
+      .from('treatments')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as Treatment[];
+  },
+
+  async create(treatment: Omit<Treatment, 'id' | 'created_at'>): Promise<Treatment> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Treatment>('/treatments', {
+        method: 'POST',
+        body: JSON.stringify(treatment),
+      });
+    }
+    
+    const { data, error } = await supabase
+      .from('treatments')
+      .insert([treatment])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Treatment;
+  },
+
+  async update(id: string, updates: Partial<Treatment>): Promise<Treatment> {
+    if (USE_PHP_BACKEND) {
+      return phpApiRequest<Treatment>(`/treatments?id=${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    }
+    
+    const { data, error } = await supabase
+      .from('treatments')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Treatment;
+  },
+
+  async delete(id: string): Promise<void> {
+    if (USE_PHP_BACKEND) {
+      await phpApiRequest<null>(`/treatments?id=${id}`, { method: 'DELETE' });
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('treatments')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  }
+};
+
+// ============================================================================
+// Chatbot Service (for AI integration)
+// ============================================================================
+
+export const chatbotService = {
+  async sendMessage(message: string): Promise<string> {
+    if (USE_PHP_BACKEND) {
+      const response = await phpApiRequest<{ response: string }>('/chatbot', {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+      return response.response;
+    }
+    
+    // Use Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
+      body: { message }
+    });
+    
+    if (error) throw error;
+    return data.response;
+  }
+};

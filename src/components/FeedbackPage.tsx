@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Star, Phone, Mail, CheckCircle, MessageSquare, Users, Heart, AlertCircle, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { feedbackService } from '@/lib/supabase';
 import DentalNavbar from './DentalNavbar';
 import DentalFooter from './DentalFooter';
 import QuickInfoCard from '@/components/common/QuickInfoCard';
@@ -166,18 +166,15 @@ const FeedbackPage: React.FC = () => {
         message += `\nTreatment Satisfaction: ${feedback.treatmentSatisfaction}/5`;
       }
       
-      const { error } = await supabase
-        .from('feedback')
-        .insert({
-          patient_name: feedback.patientName,
-          patient_email: feedback.email,
-          rating: avgRating,
-          message: message || 'No additional comments provided',
-          category: activeTab,
-          status: 'new'
-        });
-
-      if (error) throw error;
+      await feedbackService.create({
+        patient_name: feedback.patientName || '',
+        patient_email: feedback.email || '',
+        rating: avgRating,
+        message: message || 'No additional comments provided',
+        category: activeTab,
+        status: 'new',
+        patient_id: null
+      });
       
       setIsSubmitted(true);
       toast.success('Thank you for your feedback!');
@@ -417,94 +414,73 @@ const FeedbackPage: React.FC = () => {
 
                 <Separator className="bg-dental-blue-light" />
 
-                {/* Optional Contact Information */}
+                {/* Contact Information */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-dental-blue">Contact Information (Optional)</h3>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <h3 className="text-lg font-semibold text-dental-blue">Contact Information *</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="patientName" className="text-dental-blue">Name *</Label>
+                      <Label htmlFor="patientName" className="text-sm font-medium text-dental-blue">
+                        Your Name *
+                      </Label>
                       <Input
                         id="patientName"
-                        type="text"
-                        placeholder="Your full name"
+                        placeholder="Enter your name"
                         value={feedback.patientName}
                         onChange={(e) => setFeedback({ ...feedback, patientName: e.target.value })}
-                        className="border-dental-blue-light focus:border-dental-blue"
+                        className="mt-2 border-dental-blue-light focus:border-dental-blue"
                         required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="email" className="text-dental-blue">Email *</Label>
+                      <Label htmlFor="email" className="text-sm font-medium text-dental-blue">
+                        Email Address *
+                      </Label>
                       <Input
                         id="email"
                         type="email"
-                        placeholder="your.email@example.com"
+                        placeholder="Enter your email"
                         value={feedback.email}
                         onChange={(e) => setFeedback({ ...feedback, email: e.target.value })}
-                        className="border-dental-blue-light focus:border-dental-blue"
+                        className="mt-2 border-dental-blue-light focus:border-dental-blue"
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="phone" className="text-dental-blue">Phone</Label>
-                      <div className="flex">
-                        <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-dental-blue-light bg-muted text-muted-foreground text-sm">
-                          +91
-                        </span>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="9876543210"
-                          value={feedback.phone.replace(/^\+91/, '')}
-                          onChange={(e) => setFeedback({ ...feedback, phone: `+91${e.target.value.replace(/^\+91/, '')}` })}
-                          className="border-dental-blue-light focus:border-dental-blue rounded-l-none"
-                        />
-                      </div>
-                    </div>
                   </div>
-                </div>
-
-                <Separator className="bg-dental-blue-light" />
-
-                {/* Privacy Assurance */}
-                <div className="bg-dental-blue-light rounded-lg p-4">
-                  <div className="flex items-center justify-center space-x-2">
-                    <Heart className="w-5 h-5 text-dental-blue" />
-                    <p className="text-sm text-dental-blue text-center">
-                      Your feedback is confidential and will only be used to enhance our services.
-                    </p>
+                  <div>
+                    <Label htmlFor="phone" className="text-sm font-medium text-dental-blue">
+                      Phone Number (Optional)
+                    </Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="Enter your phone number"
+                      value={feedback.phone}
+                      onChange={(e) => setFeedback({ ...feedback, phone: e.target.value })}
+                      className="mt-2 border-dental-blue-light focus:border-dental-blue"
+                    />
                   </div>
                 </div>
 
                 {/* Submit Button */}
-                <div className="text-center">
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || !feedback.overallRating}
-                    variant="dental"
-                    size="xl"
-                    className="w-full sm:w-auto px-8 py-3 text-lg font-inter"
-                  >
-                    {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
-                  </Button>
-                </div>
-
-                {/* Contact Information */}
-                <div className="text-center pt-6 border-t border-dental-blue-light">
-                  <p className="text-sm text-dental-gray mb-4">
-                    If you have any immediate concerns, please feel free to contact us:
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                    <div className="flex items-center gap-2 text-sm text-dental-blue">
-                      <Phone className="w-4 h-4" />
-                      <span>(808) 095-0921</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-dental-blue">
-                      <Mail className="w-4 h-4" />
-                      <span>info@hardikdental.com</span>
-                    </div>
-                  </div>
-                </div>
+                <Button 
+                  type="submit" 
+                  variant="dental" 
+                  size="lg" 
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className="animate-spin mr-2">⏳</span>
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <MessageSquare className="w-5 h-5 mr-2" />
+                      Submit Feedback
+                    </>
+                  )}
+                </Button>
               </form>
             </CardContent>
           </Card>

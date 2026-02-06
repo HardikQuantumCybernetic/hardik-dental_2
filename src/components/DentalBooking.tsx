@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Clock, User, Phone, Mail, MessageSquare, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { patientService, appointmentService } from "@/lib/supabase";
 import QuickInfoCard from "@/components/common/QuickInfoCard";
 
 const DentalBooking = () => {
@@ -38,16 +38,8 @@ const DentalBooking = () => {
 
       setLoadingSlots(true);
       try {
-        const { data, error } = await supabase
-          .from('appointments')
-          .select('appointment_time')
-          .eq('appointment_date', formData.date)
-          .eq('doctor', formData.doctor)
-          .not('status', 'eq', 'cancelled'); // Don't count cancelled appointments
-
-        if (error) throw error;
-
-        const slots = data?.map(apt => apt.appointment_time) || [];
+        const appointments = await appointmentService.getByDateAndDoctor(formData.date, formData.doctor);
+        const slots = appointments?.map(apt => apt.appointment_time) || [];
         setBookedSlots(slots);
       } catch (error) {
         console.error('Error fetching booked slots:', error);
@@ -100,49 +92,35 @@ const DentalBooking = () => {
       let patientId;
       
       // Check if patient exists
-      const { data: existingPatient } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('email', formData.email.value)
-        .single();
+      const existingPatient = await patientService.getByEmail(formData.email.value);
       
       if (existingPatient) {
         patientId = existingPatient.id;
       } else {
         // Create new patient
-        const { data: newPatient, error: patientError } = await supabase
-          .from('patients')
-          .insert({
-            name: `${formData.firstName.value} ${formData.lastName.value}`,
-            email: formData.email.value,
-            phone: formData.phone.value,
-            date_of_birth: '1990-01-01', // Default value, should be collected in form
-            address: '', // Default value, should be collected in form
-            medical_history: formData.message || '',
-            insurance_info: '',
-            status: 'active'
-          })
-          .select()
-          .single();
-        
-        if (patientError) throw patientError;
+        const newPatient = await patientService.create({
+          name: `${formData.firstName.value} ${formData.lastName.value}`,
+          email: formData.email.value,
+          phone: formData.phone.value,
+          date_of_birth: '1990-01-01', // Default value, should be collected in form
+          address: '', // Default value, should be collected in form
+          medical_history: formData.message || '',
+          insurance_info: '',
+          status: 'active'
+        });
         patientId = newPatient.id;
       }
       
       // Create appointment
-      const { error: appointmentError } = await supabase
-        .from('appointments')
-        .insert({
-          patient_id: patientId,
-          appointment_date: formData.date,
-          appointment_time: formData.time,
-          service_type: formData.service,
-          doctor: formData.doctor,
-          status: 'scheduled',
-          notes: formData.message || ''
-        });
-      
-      if (appointmentError) throw appointmentError;
+      await appointmentService.create({
+        patient_id: patientId,
+        appointment_date: formData.date,
+        appointment_time: formData.time,
+        service_type: formData.service,
+        doctor: formData.doctor,
+        status: 'scheduled',
+        notes: formData.message || ''
+      });
       
       setIsSubmitted(true);
       toast({
@@ -418,55 +396,30 @@ const DentalBooking = () => {
               <div className="space-y-2">
                 <Label htmlFor="message" className="text-dental-blue font-medium flex items-center space-x-2">
                   <MessageSquare className="w-4 h-4" />
-                  <span>Additional Information (Optional)</span>
+                  <span>Additional Notes (Optional)</span>
                 </Label>
-                <Textarea 
-                  id="message" 
-                  className="border-dental-blue-light focus:border-dental-blue"
-                  placeholder="Please let us know if you have any specific concerns, preferences, or if this is your first visit..."
-                  rows={4}
+                <Textarea
+                  id="message"
+                  placeholder="Any special requests, medical conditions, or information we should know..."
+                  value={formData.message}
                   onChange={(e) => updateFormValue('message', e.target.value)}
+                  className="min-h-[100px] border-dental-blue-light focus:border-dental-blue resize-none"
                 />
               </div>
 
               {/* Submit Button */}
-              <div className="text-center pt-6">
-                <Button type="submit" variant="dental" size="xl" className="font-inter w-full md:w-auto">
-                  <Calendar className="w-5 h-5" />
-                  Request Appointment
-                </Button>
-                <p className="text-sm text-dental-gray mt-4">
-                  We'll contact you within 24 hours to confirm your appointment
-                </p>
-              </div>
+              <Button 
+                type="submit" 
+                variant="dental" 
+                size="lg" 
+                className="w-full font-inter"
+              >
+                <Calendar className="w-5 h-5 mr-2" />
+                Request Appointment
+              </Button>
             </form>
           </CardContent>
         </Card>
-
-        {/* Contact Information */}
-        <div className="grid md:grid-cols-3 gap-6 mt-12">
-          <Card className="text-center border-dental-blue-light">
-            <CardContent className="p-6">
-              <Phone className="w-8 h-8 text-dental-blue mx-auto mb-3" />
-              <h4 className="font-semibold text-foreground mb-2">Call Us</h4>
-              <p className="text-dental-gray">(555) 123-4567</p>
-            </CardContent>
-          </Card>
-          <Card className="text-center border-dental-blue-light">
-            <CardContent className="p-6">
-              <Mail className="w-8 h-8 text-dental-mint mx-auto mb-3" />
-              <h4 className="font-semibold text-foreground mb-2">Email Us</h4>
-              <p className="text-dental-gray">info@smilecare.com</p>
-            </CardContent>
-          </Card>
-          <Card className="text-center border-dental-blue-light">
-            <CardContent className="p-6">
-              <Clock className="w-8 h-8 text-dental-blue mx-auto mb-3" />
-              <h4 className="font-semibold text-foreground mb-2">Hours</h4>
-              <p className="text-dental-gray">Mon-Fri: 8AM-6PM</p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </section>
   );

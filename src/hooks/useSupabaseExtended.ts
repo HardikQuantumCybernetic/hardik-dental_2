@@ -15,6 +15,9 @@ import {
 } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
 
+// Check if using PHP backend
+const USE_PHP_BACKEND = import.meta.env.VITE_USE_PHP_BACKEND === 'true';
+
 // Feedback hook with real-time updates
 export const useFeedback = () => {
   const [feedback, setFeedback] = useState<Feedback[]>([])
@@ -78,12 +81,32 @@ export const useFeedback = () => {
     }
   }
 
+  const deleteFeedback = async (id: string) => {
+    try {
+      await feedbackService.delete(id)
+      setFeedback(prev => prev.filter(f => f.id !== id))
+      toast({
+        title: "Success",
+        description: "Feedback deleted successfully"
+      })
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to delete feedback",
+        variant: "destructive"
+      })
+      throw err
+    }
+  }
+
   useEffect(() => {
     fetchFeedback()
   }, [])
 
-  // Real-time updates for feedback
+  // Real-time updates for feedback (only when using Supabase)
   useEffect(() => {
+    if (USE_PHP_BACKEND) return;
+    
     const channel = supabase
       .channel('feedback_changes')
       .on('postgres_changes', 
@@ -102,6 +125,13 @@ export const useFeedback = () => {
           ));
         }
       )
+      .on('postgres_changes', 
+        { event: 'DELETE', schema: 'public', table: 'feedback' },
+        (payload) => {
+          console.log('Feedback deleted:', payload);
+          setFeedback(prev => prev.filter(item => item.id !== payload.old.id));
+        }
+      )
       .subscribe()
 
     return () => {
@@ -115,6 +145,7 @@ export const useFeedback = () => {
     error,
     addFeedback,
     updateFeedback,
+    deleteFeedback,
     refetch: fetchFeedback
   }
 }
@@ -353,15 +384,23 @@ export const usePatientAppointments = (patientId?: string) => {
 
     try {
       setLoading(true)
-      const { data, error: fetchError } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('patient_id', patientId)
-        .order('appointment_date', { ascending: true })
-        .order('appointment_time', { ascending: true })
+      
+      if (USE_PHP_BACKEND) {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${API_BASE_URL}/appointments?patient_id=${patientId}`);
+        const data = await response.json();
+        setAppointments(data.data || []);
+      } else {
+        const { data, error: fetchError } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('patient_id', patientId)
+          .order('appointment_date', { ascending: true })
+          .order('appointment_time', { ascending: true })
 
-      if (fetchError) throw fetchError
-      setAppointments(data as Appointment[] || [])
+        if (fetchError) throw fetchError
+        setAppointments(data as Appointment[] || [])
+      }
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch appointments')
@@ -393,18 +432,27 @@ export const useAllPatientAppointments = () => {
       setLoading(true)
       const today = new Date().toISOString().split('T')[0]
       
-      // Fetch ALL appointments (not just upcoming)
-      const { data, error: fetchError } = await supabase
-        .from('appointments')
-        .select('*')
-        .order('appointment_date', { ascending: false })
-        .order('appointment_time', { ascending: false })
+      let appointments: Appointment[] = [];
+      
+      if (USE_PHP_BACKEND) {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+        const response = await fetch(`${API_BASE_URL}/appointments`);
+        const data = await response.json();
+        appointments = data.data || [];
+      } else {
+        const { data, error: fetchError } = await supabase
+          .from('appointments')
+          .select('*')
+          .order('appointment_date', { ascending: false })
+          .order('appointment_time', { ascending: false })
 
-      if (fetchError) throw fetchError
+        if (fetchError) throw fetchError
+        appointments = data as Appointment[] || [];
+      }
 
       // Group appointments by patient_id, separating upcoming and past
       const grouped: Record<string, { upcoming: Appointment[], past: Appointment[] }> = {}
-      ;(data as Appointment[] || []).forEach(apt => {
+      appointments.forEach(apt => {
         if (apt.patient_id) {
           if (!grouped[apt.patient_id]) {
             grouped[apt.patient_id] = { upcoming: [], past: [] }
@@ -429,7 +477,6 @@ export const useAllPatientAppointments = () => {
           const dateB = `${b.appointment_date}T${b.appointment_time}`
           return dateA.localeCompare(dateB)
         })
-        // Past appointments already sorted by date descending (most recent first)
       })
 
       setAppointmentsByPatient(grouped)

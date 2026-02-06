@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client'
 import { Patient, Appointment, patientService, appointmentService } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
 
+// Check if using PHP backend
+const USE_PHP_BACKEND = import.meta.env.VITE_USE_PHP_BACKEND === 'true';
+
 export const usePatients = () => {
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
@@ -87,8 +90,10 @@ export const usePatients = () => {
     fetchPatients()
   }, [])
 
-  // Realtime updates for patients
+  // Realtime updates for patients (only when using Supabase)
   useEffect(() => {
+    if (USE_PHP_BACKEND) return; // Skip realtime for PHP backend
+    
     const channel = supabase
       .channel('patients_changes_in_hook')
       .on('postgres_changes', 
@@ -142,7 +147,7 @@ export const useAppointments = () => {
     try {
       setLoading(true)
       const data = await appointmentService.getAll()
-      console.log('📅 Fetched appointments:', data) // Debug log
+      console.log('📅 Fetched appointments:', data)
       setAppointments(data || [])
       setError(null)
     } catch (err) {
@@ -217,8 +222,10 @@ export const useAppointments = () => {
     fetchAppointments()
   }, [])
 
-  // Realtime updates for appointments
+  // Realtime updates for appointments (only when using Supabase)
   useEffect(() => {
+    if (USE_PHP_BACKEND) return; // Skip realtime for PHP backend
+    
     const channel = supabase
       .channel('appointments_changes')
       .on('postgres_changes', 
@@ -248,6 +255,7 @@ export const useAppointments = () => {
       supabase.removeChannel(channel)
     }
   }, [])
+  
   return {
     appointments,
     loading,
@@ -259,18 +267,19 @@ export const useAppointments = () => {
   }
 }
 
-// Real-time subscriptions
+// Real-time subscriptions (only for Supabase mode)
 export const useRealtimePatients = () => {
   const [patients, setPatients] = useState<Patient[]>([])
 
   useEffect(() => {
+    if (USE_PHP_BACKEND) return; // Skip for PHP backend
+    
     const channel = supabase
       .channel('patients_changes')
       .on('postgres_changes', 
         { event: '*', schema: 'public', table: 'patients' },
         (payload) => {
           console.log('Patient change received:', payload)
-          // Handle real-time updates
           if (payload.eventType === 'INSERT') {
             setPatients(prev => [payload.new as Patient, ...prev])
           } else if (payload.eventType === 'UPDATE') {
