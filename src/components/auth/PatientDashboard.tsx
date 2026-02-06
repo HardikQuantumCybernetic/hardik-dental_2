@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, Phone, Mail, Clock, FileText, LogOut, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { patientService, appointmentService, Appointment } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import DentalNavbar from "@/components/DentalNavbar";
 import DentalFooter from "@/components/DentalFooter";
@@ -16,7 +16,7 @@ interface PatientDashboardProps {
 }
 
 const PatientDashboard = ({ user, onLogout }: PatientDashboardProps) => {
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -38,43 +38,23 @@ const PatientDashboard = ({ user, onLogout }: PatientDashboardProps) => {
       }
 
       // First, check if patient exists in our database
-      const { data: patients, error: patientError } = await supabase
-        .from('patients')
-        .select('id, name, email')
-        .eq('email', userEmail)
-        .limit(1);
+      const existingPatient = await patientService.getByEmail(userEmail);
 
-      if (patientError) {
-        console.error('Error fetching patient:', patientError);
-        toast({
-          title: "Error",
-          description: "Failed to load patient information",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
-      if (!patients || patients.length === 0) {
+      if (!existingPatient) {
         // Patient doesn't exist, create them
-        const newPatient = {
-          name: user?.fullName || user?.firstName + ' ' + user?.lastName || 'Unknown',
-          email: userEmail,
-          phone: user?.phoneNumbers?.[0]?.phoneNumber || '',
-          date_of_birth: '1990-01-01', // Default date, should be updated by patient
-          address: '',
-          medical_history: '',
-          insurance_info: '',
-          status: 'active' as const
-        };
-
-        const { data: createdPatient, error: createError } = await supabase
-          .from('patients')
-          .insert([newPatient])
-          .select()
-          .single();
-
-        if (createError) {
+        try {
+          await patientService.create({
+            name: user?.fullName || user?.firstName + ' ' + user?.lastName || 'Unknown',
+            email: userEmail,
+            phone: user?.phoneNumbers?.[0]?.phoneNumber || '',
+            date_of_birth: '1990-01-01', // Default date, should be updated by patient
+            address: '',
+            medical_history: '',
+            insurance_info: '',
+            status: 'active'
+          });
+          console.log('Created new patient');
+        } catch (createError) {
           console.error('Error creating patient:', createError);
           toast({
             title: "Error",
@@ -84,27 +64,17 @@ const PatientDashboard = ({ user, onLogout }: PatientDashboardProps) => {
           setLoading(false);
           return;
         }
-
-        console.log('Created new patient:', createdPatient);
       }
 
-      // Now get appointments for this patient
-      const { data: appointments, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .in('patient_id', patients?.map(p => p.id) || [])
-        .order('appointment_date', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching appointments:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load appointments",
-          variant: "destructive",
-        });
-      } else {
-        setAppointments(appointments || []);
-      }
+      // Now get all appointments and filter by email match
+      const allAppointments = await appointmentService.getAll();
+      
+      // Filter appointments that belong to this patient
+      const userAppointments = allAppointments.filter((apt: any) => 
+        apt.patient_email === userEmail
+      );
+      
+      setAppointments(userAppointments);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -119,7 +89,6 @@ const PatientDashboard = ({ user, onLogout }: PatientDashboardProps) => {
 
   const handleLogout = async () => {
     try {
-      // For Clerk, we just call the onLogout function
       toast({
         title: "Logged Out",
         description: "You have been successfully logged out.",

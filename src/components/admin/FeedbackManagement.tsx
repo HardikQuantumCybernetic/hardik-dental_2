@@ -23,8 +23,9 @@ import {
 } from "lucide-react";
 import { downloadCSV, downloadExcel } from "@/utils/downloadUtils";
 import { useToast } from "@/hooks/use-toast";
+import { feedbackService } from "@/lib/supabase";
 import { useFeedback } from "@/hooks/useSupabaseExtended";
-import { supabase } from "@/integrations/supabase/client";
+
 
 const FeedbackManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -32,7 +33,7 @@ const FeedbackManagement = () => {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
   const { toast } = useToast();
-  const { feedback, loading, updateFeedback } = useFeedback();
+  const { feedback, loading, updateFeedback, deleteFeedback, refetch } = useFeedback();
 
   // Filter out contact messages - those are shown in Messages tab
   const actualFeedback = useMemo(() => {
@@ -108,17 +109,15 @@ const FeedbackManagement = () => {
   const handleDeleteFeedback = async (feedbackId: string) => {
     if (window.confirm("Are you sure you want to delete this feedback? This action cannot be undone.")) {
       try {
-        const { error } = await supabase
-          .from('feedback')
-          .delete()
-          .eq('id', feedbackId);
-        
-        if (error) throw error;
+        await feedbackService.delete(feedbackId);
         
         toast({
           title: "Success",
           description: "Feedback deleted successfully",
         });
+        
+        // Refresh the feedback list
+        refetch();
       } catch (error) {
         toast({
           title: "Error",
